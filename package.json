@@ -6,6 +6,9 @@
   "bin": {
     "eventcatalog-linter": "./dist/cli/index.js"
   },
+  "publishConfig": {
+    "access": "public"
+  },
   "scripts": {
     "build": "tsc",
     "dev": "tsx watch src/cli/index.ts",
