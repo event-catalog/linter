@@ -1,6 +1,6 @@
 {
   "name": "@eventcatalog/linter",
-  "version": "0.0.1",
+  "version": "0.0.2",
   "description": "A linter for EventCatalog to validate frontmatter and resource references",
   "main": "dist/index.js",
   "bin": {
