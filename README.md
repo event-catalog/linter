@@ -91,8 +91,8 @@ Add to your `package.json` scripts:
 ```json
 {
   "scripts": {
-    "lint:eventcatalog": "@eventcatalog/linter",
-    "lint:eventcatalog:verbose": "@eventcatalog/linter --verbose"
+    "lint:eventcatalog": "eventcatalog-linter",
+    "lint:eventcatalog:verbose": "eventcatalog-linter --verbose"
   }
 }
 ```
