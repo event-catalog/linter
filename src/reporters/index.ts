@@ -94,7 +94,7 @@ export const reportErrors = (
   const totalWarnings = warnings.length;
 
   if (totalErrors === 0 && totalWarnings === 0) {
-    console.log(chalk.green('\\n✔ No problems found!'));
+    console.log(chalk.green('✔ No problems found!'));
     return {
       totalErrors: 0,
       totalWarnings: 0,
