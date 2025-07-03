@@ -36,7 +36,9 @@ const RESOURCE_PATTERNS: Record<ResourceType, string[]> = {
 };
 
 export const extractResourceInfo = (filePath: string, resourceType: ResourceType): { id: string; version?: string } => {
-  const relativePath = filePath.split(path.sep);
+  // Normalize path separators to forward slashes for consistent parsing across platforms
+  const normalizedPath = filePath.replace(/\\/g, '/');
+  const relativePath = normalizedPath.split('/');
 
   if (resourceType === 'user' || resourceType === 'team') {
     const filename = path.basename(filePath, path.extname(filePath));
