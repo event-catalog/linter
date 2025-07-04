@@ -1,5 +1,11 @@
 # @eventcatalog/linter
 
+## 0.0.4
+
+### Patch Changes
+
+- 5d3205c: feat(cli): added config support
+
 ## 0.0.3
 
 ### Patch Changes
