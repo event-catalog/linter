@@ -30,6 +30,11 @@ export const formatError = (error: ValidationError, showFilename: boolean = true
 };
 
 const getErrorCode = (error: ValidationError): string => {
+  if (error.rule) {
+    return `(${error.rule})`;
+  }
+
+  // Fallback to generic error codes
   if (error.type === 'schema') {
     if (error.field) {
       if (error.message.includes('Required')) return '(@eventcatalog/required-field)';

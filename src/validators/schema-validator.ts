@@ -20,12 +20,22 @@ export const validateSchema = (parsedFile: ParsedFile): ValidationError[] => {
           message = `Expected ${issue.expected}, but received ${issue.received}`;
         }
 
+        let rule = 'schema/required-fields';
+        if (issue.code === 'invalid_type') {
+          rule = 'schema/valid-type';
+        } else if (issue.code === 'invalid_string' && issue.validation === 'email') {
+          rule = 'schema/valid-email';
+        } else if (field && field.includes('version')) {
+          rule = 'schema/valid-semver';
+        }
+
         errors.push({
           type: 'schema',
           resource: `${file.resourceType}/${file.resourceId}`,
           field: field || undefined,
           message: field ? `${field}: ${message}` : message,
           file: file.relativePath,
+          rule,
         });
       }
     } else {
@@ -34,6 +44,7 @@ export const validateSchema = (parsedFile: ParsedFile): ValidationError[] => {
         resource: `${file.resourceType}/${file.resourceId}`,
         message: error instanceof Error ? error.message : String(error),
         file: file.relativePath,
+        rule: 'schema/validation-error',
       });
     }
   }

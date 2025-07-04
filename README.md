@@ -10,6 +10,9 @@ A comprehensive linter for EventCatalog that validates frontmatter schemas and r
 - **📋 Schema Validation**: Validates all resource frontmatter against defined schemas using Zod
 - **🔗 Reference Validation**: Ensures all referenced resources (services, events, domains, etc.) actually exist
 - **📦 Semver Version Support**: Supports semantic versions, ranges (`^1.0.0`, `~1.2.0`), x-patterns (`0.0.x`), and `latest`
+- **⚙️ Configurable Rules**: Optional `.eventcatalogrc.js` config file for customizing rule severity and behavior
+- **🚫 Ignore Patterns**: Skip validation for specific file patterns (archived, drafts, etc.)
+- **🎯 Rule Overrides**: Apply different rules to different file patterns for flexible team workflows
 - **🎯 Comprehensive Coverage**: Supports all EventCatalog resource types
 - **⚡ Fast Performance**: Efficiently scans large catalogs
 - **🎨 ESLint-Inspired Output**: Clean, file-grouped error reporting with severity levels
@@ -31,16 +34,16 @@ A comprehensive linter for EventCatalog that validates frontmatter schemas and r
 
 ## 📦 Installation
 
-### Global Installation
-
-```bash
-npm install -g @eventcatalog/linter
-```
-
 ### Use with npx (Recommended)
 
 ```bash
 npx @eventcatalog/linter
+```
+
+### Global Installation
+
+```bash
+npm install -g @eventcatalog/linter
 ```
 
 ### Add to your project
@@ -48,6 +51,30 @@ npx @eventcatalog/linter
 ```bash
 npm install --save-dev @eventcatalog/linter
 ```
+
+### Quick Start
+
+1. **Install and run**: Start linting immediately with npx
+
+   ```bash
+   npx @eventcatalog/linter
+   ```
+
+2. **Add configuration**: Create a `.eventcatalogrc.js` file to customize rules
+
+   ```javascript
+   module.exports = {
+     rules: {
+       'best-practices/summary-required': 'warn',
+       'refs/owner-exists': 'error',
+     },
+   };
+   ```
+
+3. **Integrate with CI/CD**: Add to your GitHub Actions or GitLab CI
+   ```yaml
+   - run: npx @eventcatalog/linter
+   ```
 
 ## 🛠️ Usage
 
@@ -125,6 +152,161 @@ eventcatalog-lint:
   script:
     - npx @eventcatalog/linter
 ```
+
+## ⚙️ Configuration
+
+The EventCatalog Linter supports optional configuration through a `.eventcatalogrc.js` file in your catalog root directory. This allows you to:
+
+- Turn rules on/off
+- Configure rule severity levels (error, warn, off)
+- Ignore specific file patterns
+- Override rules for specific file patterns
+
+### Configuration File
+
+Create a `.eventcatalogrc.js` file in your EventCatalog root directory:
+
+```javascript
+// .eventcatalogrc.js
+module.exports = {
+  rules: {
+    // Schema validation rules
+    'schema/required-fields': 'error',
+    'schema/valid-semver': 'error',
+    'schema/valid-email': 'warn',
+
+    // Reference validation rules
+    'refs/owner-exists': 'error',
+    'refs/valid-version-range': 'error',
+
+    // Best practice rules
+    'best-practices/summary-required': 'warn',
+    'best-practices/owner-required': 'error',
+  },
+
+  // Ignore certain paths
+  ignorePatterns: ['**/archived/**', '**/drafts/**'],
+
+  // Override rules for specific file patterns
+  overrides: [
+    {
+      files: ['**/experimental/**'],
+      rules: {
+        'best-practices/owner-required': 'off',
+      },
+    },
+  ],
+};
+```
+
+### Rule Severity Levels
+
+- **`'error'`** - Causes the linter to exit with error code 1
+- **`'warn'`** - Shows warnings but allows the linter to pass (unless `--fail-on-warning` is used)
+- **`'off'`** - Disables the rule completely
+
+### Available Rules
+
+| Rule Name                         | Description                                                                | Accepted Values        | Default        |
+| --------------------------------- | -------------------------------------------------------------------------- | ---------------------- | -------------- |
+| **Schema Validation Rules**       |
+| `schema/required-fields`          | Validates that required fields are present in frontmatter                  | `error`, `warn`, `off` | `error`        |
+| `schema/valid-type`               | Validates that field types are correct (strings, arrays, objects)          | `error`, `warn`, `off` | `error`        |
+| `schema/valid-semver`             | Validates semantic version format (1.0.0, 2.1.3-beta)                      | `error`, `warn`, `off` | `error`        |
+| `schema/valid-email`              | Validates email address format in user frontmatter                         | `error`, `warn`, `off` | `error`        |
+| `schema/validation-error`         | General schema validation errors                                           | `error`, `warn`, `off` | `error`        |
+| **Reference Validation Rules**    |
+| `refs/owner-exists`               | Ensures referenced owners (users/teams) exist                              | `error`, `warn`, `off` | `error`        |
+| `refs/valid-version-range`        | Validates version references and patterns                                  | `error`, `warn`, `off` | `error`        |
+| `refs/resource-exists`            | Ensures referenced resources exist (always enabled for critical resources) | Always enabled         | Always enabled |
+| **Best Practice Rules**           |
+| `best-practices/summary-required` | Requires summary field for better documentation                            | `error`, `warn`, `off` | `error`        |
+| `best-practices/owner-required`   | Requires at least one owner for accountability                             | `error`, `warn`, `off` | `error`        |
+
+**Note**: Core resource reference validation (services, domains, entities) is always enabled and cannot be disabled, ensuring referential integrity of your EventCatalog.
+
+### Configuration Examples
+
+#### Relaxed Configuration for Development
+
+```javascript
+module.exports = {
+  rules: {
+    'best-practices/summary-required': 'warn',
+    'best-practices/owner-required': 'warn',
+    'refs/owner-exists': 'warn',
+  },
+  ignorePatterns: ['**/drafts/**', '**/experimental/**'],
+};
+```
+
+#### Strict Configuration for Production
+
+```javascript
+module.exports = {
+  rules: {
+    'schema/required-fields': 'error',
+    'refs/owner-exists': 'error',
+    'best-practices/summary-required': 'error',
+    'best-practices/owner-required': 'error',
+  },
+};
+```
+
+#### Team-Specific Overrides
+
+```javascript
+module.exports = {
+  rules: {
+    'best-practices/owner-required': 'error',
+    'best-practices/summary-required': 'error',
+  },
+  overrides: [
+    {
+      files: ['**/legacy/**'],
+      rules: {
+        'best-practices/owner-required': 'warn',
+        'best-practices/summary-required': 'off',
+      },
+    },
+    {
+      files: ['**/critical/**'],
+      rules: {
+        'best-practices/summary-required': 'error',
+        'refs/owner-exists': 'error',
+      },
+    },
+  ],
+};
+```
+
+### Using with CI/CD
+
+The configuration file allows you to have different validation rules for different environments:
+
+```bash
+# Development - warnings allowed
+npx @eventcatalog/linter
+
+# Production - fail on warnings
+npx @eventcatalog/linter --fail-on-warning
+```
+
+### Using with CI/CD
+
+The configuration file allows you to have different validation rules for different environments:
+
+```bash
+# Development - warnings allowed
+npx @eventcatalog/linter
+
+# Production - fail on warnings
+npx @eventcatalog/linter --fail-on-warning
+```
+
+### Default Behavior
+
+If no `.eventcatalogrc.js` file is found, the linter uses default rules where all validations are set to `'error'`. This ensures strict validation out of the box, making it easy to get started with quality documentation practices.
 
 ## ✅ What It Validates
 
@@ -204,18 +386,18 @@ $ eventcatalog-linter
 $ eventcatalog-linter
 
 services/user-service/index.mdx
-  ✖ error version: Invalid semantic version format [version] (@eventcatalog/schema-validation)
-  ⚠ warning summary should be provided for better documentation [summary] (@eventcatalog/schema-validation)
+  ✖ error version: Invalid semantic version format [version] (schema/valid-semver)
+  ⚠ warning Summary is required for better documentation [summary] (best-practices/summary-required)
 
 ✖ 2 problems
 
 domains/sales/index.mdx
-  ✖ error Referenced service "order-service" does not exist [services] (@eventcatalog/invalid-reference)
+  ✖ error Referenced service "order-service" does not exist [services] (refs/resource-exists)
 
 ✖ 1 problem
 
 flows/user-registration/index.mdx
-  ✖ error Referenced service "notification-service" (version: 2.0.0) does not exist [steps[1].service] (@eventcatalog/invalid-reference)
+  ✖ error Referenced service "notification-service" (version: 2.0.0) does not exist [steps[1].service] (refs/valid-version-range)
 
 ✖ 1 problem
 
@@ -229,12 +411,12 @@ flows/user-registration/index.mdx
 $ eventcatalog-linter --verbose
 
 services/user-service/index.mdx
-  ✖ error version: Invalid semantic version format [version] (@eventcatalog/schema-validation)
+  ✖ error version: Invalid semantic version format [version] (schema/valid-semver)
 
 ✖ 1 problem
 
 domains/sales/index.mdx
-  ✖ error Referenced service "order-service" does not exist [services] (@eventcatalog/invalid-reference)
+  ✖ error Referenced service "order-service" does not exist [services] (refs/resource-exists)
 
 ✖ 1 problem
 
@@ -442,32 +624,43 @@ email: invalid-email # Should be john@example.com
 ---
 ```
 
-## 🏷️ Error Codes
+## 🏷️ Rule Names and Error Codes
 
-The linter provides descriptive error codes to help identify and fix issues quickly:
+The linter provides descriptive rule names in parentheses to help identify and fix issues quickly. Each error shows the specific rule that was violated:
 
-### Schema Validation Errors
+### Schema Validation Rules
 
-- `@eventcatalog/required-field` - Required field is missing
-- `@eventcatalog/invalid-type` - Field has wrong data type
-- `@eventcatalog/schema-validation` - General schema validation error
-- `@eventcatalog/schema` - Schema-related validation error
+- `(schema/required-fields)` - Required field is missing
+- `(schema/valid-type)` - Field has wrong data type
+- `(schema/valid-semver)` - Invalid semantic version format
+- `(schema/valid-email)` - Invalid email address format
+- `(schema/validation-error)` - General schema validation error
 
-### Reference Validation Errors
+### Reference Validation Rules
 
-- `@eventcatalog/invalid-reference` - Referenced resource doesn't exist
+- `(refs/owner-exists)` - Referenced owner (user/team) doesn't exist
+- `(refs/valid-version-range)` - Referenced version doesn't exist or invalid pattern
+- `(refs/resource-exists)` - Referenced resource doesn't exist
+
+### Best Practice Rules
+
+- `(best-practices/summary-required)` - Summary field is missing
+- `(best-practices/owner-required)` - At least one owner is required
 
 ### Parse Errors
 
-- `@eventcatalog/parse-error` - YAML/frontmatter parsing error
+- `(@eventcatalog/parse-error)` - YAML/frontmatter parsing error
 
-### Example with Error Codes
+### Example with Rule Names
 
 ```bash
 services/user-service/index.mdx
-  ✖ error name: Required [name] (@eventcatalog/required-field)
-  ✖ error version: Invalid semantic version format [version] (@eventcatalog/schema-validation)
-  ✖ error Referenced service "missing-service" does not exist [sends] (@eventcatalog/invalid-reference)
+  ✖ error name: Expected string, but received undefined [name] (schema/valid-type)
+  ✖ error version: Invalid semantic version format [version] (schema/valid-semver)
+  ✖ error Referenced user/team "missing-owner" does not exist [owners] (refs/owner-exists)
+  ✖ error Summary is required for better documentation [summary] (best-practices/summary-required)
+
+✖ 4 problems
 ```
 
 ## ⚠️ Warnings Support
@@ -542,14 +735,17 @@ npm test schema-validator.test.ts
 ```
 src/
 ├── cli/           # Command-line interface
+├── config/        # Configuration loading and rule management
 ├── schemas/       # Zod validation schemas
 ├── scanner/       # File system scanning
 ├── parser/        # Frontmatter parsing
-├── validators/    # Validation logic
+├── validators/    # Validation logic (schema, reference, best practices)
 ├── reporters/     # Error reporting
 └── types/         # TypeScript definitions
 
 tests/
+├── config.test.ts
+├── cli-integration.test.ts
 ├── schema-validator.test.ts
 ├── reference-validator.test.ts
 ├── scanner.test.ts

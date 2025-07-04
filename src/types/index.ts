@@ -81,6 +81,7 @@ export interface ValidationError {
   file: string;
   line?: number;
   severity?: 'error' | 'warning';
+  rule?: string;
 }
 
 export interface LinterOptions {

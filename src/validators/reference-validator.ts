@@ -16,10 +16,15 @@ export const buildResourceIndex = (parsedFiles: ParsedFile[]): ResourceIndex => 
     const { file, frontmatter } = parsedFile;
     const { resourceType } = file;
 
-    // For users and teams, use the frontmatter id field instead of filename
+    // For users, teams, and domains, use the frontmatter id field instead of filename/directory
     // This handles cases where filename is "aSmith.mdx" but frontmatter has id: "asmith"
+    // And where directory is "e-commerce" but frontmatter has id: "E-Commerce"
     let resourceId = file.resourceId;
-    if ((resourceType === 'user' || resourceType === 'team') && frontmatter.id && typeof frontmatter.id === 'string') {
+    if (
+      (resourceType === 'user' || resourceType === 'team' || resourceType === 'domain') &&
+      frontmatter.id &&
+      typeof frontmatter.id === 'string'
+    ) {
       resourceId = frontmatter.id;
     }
 
@@ -110,6 +115,11 @@ const extractReferences = (parsedFile: ParsedFile): ReferenceInfo[] => {
         references.push({ ref, possibleTypes: ['service'], field: 'services' });
       });
     }
+    if (frontmatter.domains && Array.isArray(frontmatter.domains)) {
+      frontmatter.domains.forEach((ref: ResourceReference) => {
+        references.push({ ref, possibleTypes: ['domain'], field: 'domains' });
+      });
+    }
     if (frontmatter.entities && Array.isArray(frontmatter.entities)) {
       frontmatter.entities.forEach((ref: ResourceReference) => {
         references.push({ ref, possibleTypes: ['entity'], field: 'entities' });
@@ -190,12 +200,21 @@ export const validateReferences = (parsedFiles: ParsedFile[]): ValidationError[]
       if (!found) {
         const versionStr = ref.version ? ` (version: ${ref.version})` : '';
         const typeStr = possibleTypes.length === 1 ? possibleTypes[0] : possibleTypes.join('/');
+
+        let rule = 'refs/resource-exists';
+        if (field === 'owners') {
+          rule = 'refs/owner-exists';
+        } else if (ref.version) {
+          rule = 'refs/valid-version-range';
+        }
+
         errors.push({
           type: 'reference',
           resource: `${parsedFile.file.resourceType}/${parsedFile.file.resourceId}`,
           field,
           message: `Referenced ${typeStr} "${ref.id}"${versionStr} does not exist`,
           file: parsedFile.file.relativePath,
+          rule,
         });
       }
     }

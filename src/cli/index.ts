@@ -9,6 +9,7 @@ import { parseAllFiles } from '../parser';
 import { validateCatalog } from '../validators';
 import { reportErrors } from '../reporters';
 import { LinterOptions } from '../types';
+import { loadConfig, shouldIgnoreFile, getEffectiveRules, applyRuleSeverity } from '../config';
 
 const program = new Command();
 
@@ -21,11 +22,24 @@ program
   .option('--fail-on-warning', 'Exit with non-zero code on warnings', false)
   .action(async (directory: string, options: Partial<LinterOptions>) => {
     const rootDir = path.resolve(directory);
-    const spinner = ora('Scanning EventCatalog files...').start();
+    const spinner = ora('Loading configuration...').start();
 
     try {
-      const files = await scanCatalogFiles(rootDir);
-      spinner.text = `Found ${files.length} catalog files`;
+      // Load configuration
+      const config = loadConfig(rootDir);
+
+      spinner.text = 'Scanning EventCatalog files...';
+      const allFiles = await scanCatalogFiles(rootDir);
+
+      // Filter out ignored files
+      const files = allFiles.filter((file) => !shouldIgnoreFile(file.relativePath, config.ignorePatterns || []));
+
+      const ignoredCount = allFiles.length - files.length;
+      if (ignoredCount > 0) {
+        spinner.text = `Found ${files.length} catalog files (${ignoredCount} ignored)`;
+      } else {
+        spinner.text = `Found ${files.length} catalog files`;
+      }
 
       if (files.length === 0) {
         spinner.warn('No EventCatalog files found');
@@ -36,7 +50,14 @@ program
       const { parsed, errors: parseErrors } = await parseAllFiles(files);
 
       spinner.text = 'Validating catalog...';
-      const validationErrors = validateCatalog(parsed);
+      const rawValidationErrors = validateCatalog(parsed);
+
+      // Apply rule configuration to each file's errors
+      const validationErrors = parsed.flatMap((parsedFile) => {
+        const fileErrors = rawValidationErrors.filter((error) => error.file === parsedFile.file.relativePath);
+        const effectiveRules = getEffectiveRules(parsedFile.file.relativePath, config);
+        return applyRuleSeverity(fileErrors, effectiveRules);
+      });
 
       spinner.stop();
 
