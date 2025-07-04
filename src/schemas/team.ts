@@ -4,7 +4,7 @@ export const teamSchema = z.object({
   id: z.string(),
   name: z.string(),
   summary: z.string().optional(),
-  email: z.string().optional(),
+  email: z.string().email().optional(),
   hidden: z.boolean().optional(),
   slackDirectMessageUrl: z.string().optional(),
   msTeamsDirectMessageUrl: z.string().optional(),

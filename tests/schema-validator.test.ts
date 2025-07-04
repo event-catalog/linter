@@ -168,4 +168,93 @@ describe('validateSchema', () => {
       expect(errors).toHaveLength(0);
     });
   });
+
+  describe('user validation', () => {
+    it('should pass with valid user frontmatter', () => {
+      const parsedFile = createParsedFile('user', {
+        id: 'john-doe',
+        name: 'John Doe',
+        email: 'john.doe@example.com',
+        role: 'Developer',
+      });
+
+      const errors = validateSchema(parsedFile);
+      expect(errors).toHaveLength(0);
+    });
+
+    it('should pass with minimal user frontmatter', () => {
+      const parsedFile = createParsedFile('user', {
+        id: 'jane-doe',
+        name: 'Jane Doe',
+      });
+
+      const errors = validateSchema(parsedFile);
+      expect(errors).toHaveLength(0);
+    });
+
+    it('should fail with invalid email format', () => {
+      const parsedFile = createParsedFile('user', {
+        id: 'john-doe',
+        name: 'John Doe',
+        email: 'invalid-email-format',
+      });
+
+      const errors = validateSchema(parsedFile);
+      expect(errors.length).toBeGreaterThan(0);
+      expect(errors[0].type).toBe('schema');
+      expect(errors[0].field).toBe('email');
+      expect(errors[0].message).toContain('Invalid email');
+    });
+
+    it('should fail with empty email string', () => {
+      const parsedFile = createParsedFile('user', {
+        id: 'john-doe',
+        name: 'John Doe',
+        email: '',
+      });
+
+      const errors = validateSchema(parsedFile);
+      expect(errors.length).toBeGreaterThan(0);
+      expect(errors[0].field).toBe('email');
+    });
+  });
+
+  describe('team validation', () => {
+    it('should pass with valid team frontmatter', () => {
+      const parsedFile = createParsedFile('team', {
+        id: 'platform-team',
+        name: 'Platform Team',
+        email: 'platform-team@example.com',
+        summary: 'Handles platform infrastructure',
+        members: ['john-doe', 'jane-doe'],
+      });
+
+      const errors = validateSchema(parsedFile);
+      expect(errors).toHaveLength(0);
+    });
+
+    it('should pass with minimal team frontmatter', () => {
+      const parsedFile = createParsedFile('team', {
+        id: 'platform-team',
+        name: 'Platform Team',
+      });
+
+      const errors = validateSchema(parsedFile);
+      expect(errors).toHaveLength(0);
+    });
+
+    it('should fail with invalid email format', () => {
+      const parsedFile = createParsedFile('team', {
+        id: 'platform-team',
+        name: 'Platform Team',
+        email: 'not-an-email',
+      });
+
+      const errors = validateSchema(parsedFile);
+      expect(errors.length).toBeGreaterThan(0);
+      expect(errors[0].type).toBe('schema');
+      expect(errors[0].field).toBe('email');
+      expect(errors[0].message).toContain('Invalid email');
+    });
+  });
 });
