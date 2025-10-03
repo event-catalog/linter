@@ -257,4 +257,34 @@ describe('validateSchema', () => {
       expect(errors[0].message).toContain('Invalid email');
     });
   });
+
+  describe('data store validation', () => {
+    it('should pass with valid data store frontmatter', () => {
+      const parsedFile = createParsedFile('dataStore', {
+        id: 'user-data-store',
+        name: 'User Data Store',
+        version: '1.0.0',
+        container_type: 'database',
+        technology: 'PostgreSQL',
+        authoritative: true,
+        access_mode: 'readWrite',
+        classification: 'public',
+        residency: 'US',
+        retention: '1 year',
+      });
+      const errors = validateSchema(parsedFile);
+      expect(errors).toHaveLength(0);
+    });
+
+    it('should fail with invalid container type', () => {
+      const parsedFile = createParsedFile('dataStore', {
+        id: 'user-data-store',
+        name: 'User Data Store',
+        version: '1.0.0',
+        container_type: 'invalid-container-type',
+      });
+      const errors = validateSchema(parsedFile);
+      expect(errors.length).toBeGreaterThan(0);
+    });
+  });
 });

@@ -6,5 +6,7 @@ export const serviceSchema = z
     sends: z.array(pointerSchema).optional(),
     receives: z.array(pointerSchema).optional(),
     entities: z.array(pointerSchema).optional(),
+    writesTo: z.array(pointerSchema).optional(),
+    readsFrom: z.array(pointerSchema).optional(),
   })
   .merge(baseSchema);
