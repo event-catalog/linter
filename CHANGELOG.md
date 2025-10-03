@@ -1,5 +1,11 @@
 # @eventcatalog/linter
 
+## 0.0.5
+
+### Patch Changes
+
+- c78af45: feat(linter): added support for data stores
+
 ## 0.0.4
 
 ### Patch Changes
