@@ -33,6 +33,7 @@ const RESOURCE_PATTERNS: Record<ResourceType, string[]> = {
   entity: ['**/entities/*/index.{md,mdx}', '**/entities/*/versioned/*/index.{md,mdx}'],
   user: ['users/*.{md,mdx}'],
   team: ['teams/*.{md,mdx}'],
+  dataStore: ['**/containers/*/index.{md,mdx}', '**/containers/*/versioned/*/index.{md,mdx}'],
 };
 
 export const extractResourceInfo = (filePath: string, resourceType: ResourceType): { id: string; version?: string } => {
