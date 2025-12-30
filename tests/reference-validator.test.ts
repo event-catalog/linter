@@ -22,9 +22,9 @@ const createParsedFile = (resourceType: any, resourceId: string, frontmatter: an
 describe('buildResourceIndex', () => {
   it('should build index with resources and versions', () => {
     const parsedFiles: ParsedFile[] = [
-      createParsedFile('service', 'user-service', { version: '1.0.0' }),
-      createParsedFile('service', 'user-service', { version: '2.0.0' }),
-      createParsedFile('event', 'user-created', { version: '1.0.0' }),
+      createParsedFile('service', 'user-service', { id: 'user-service', version: '1.0.0' }),
+      createParsedFile('service', 'user-service', { id: 'user-service', version: '2.0.0' }),
+      createParsedFile('event', 'user-created', { id: 'user-created', version: '1.0.0' }),
       createParsedFile('user', 'john-doe', {}),
     ];
 
@@ -36,6 +36,27 @@ describe('buildResourceIndex', () => {
     expect(index.event['user-created'].has('1.0.0')).toBe(true);
     expect(index.user['john-doe']).toBeDefined();
   });
+
+  it('should use frontmatter.id for events/services/channels when different from file path', () => {
+    const parsedFiles: ParsedFile[] = [
+      // file.resourceId from path is 'UserService' (SentenceCase), but frontmatter.id is 'user-service' (kebab-case)
+      createParsedFile('service', 'UserService', { id: 'user-service', version: '1.0.0' }),
+      // file.resourceId from path is 'UserCreated' (SentenceCase), but frontmatter.id is 'user-created' (kebab-case)
+      createParsedFile('event', 'UserCreated', { id: 'user-created', version: '1.0.0' }),
+    ];
+
+    const index = buildResourceIndex(parsedFiles);
+
+    // Should use frontmatter.id, not file.resourceId
+    expect(index.service['user-service']).toBeDefined();
+    expect(index.service['user-service'].has('1.0.0')).toBe(true);
+    expect(index.event['user-created']).toBeDefined();
+    expect(index.event['user-created'].has('1.0.0')).toBe(true);
+    
+    // Should NOT have entries for the path-based IDs
+    expect(index.service['UserService']).toBeUndefined();
+    expect(index.event['UserCreated']).toBeUndefined();
+  });
 });
 
 describe('validateReferences', () => {
@@ -46,11 +67,26 @@ describe('validateReferences', () => {
         services: [{ id: 'order-service' }],
         entities: [{ id: 'order', version: '1.0.0' }],
       }),
-      createParsedFile('service', 'order-service', { version: '1.0.0' }),
-      createParsedFile('entity', 'order', { version: '1.0.0' }),
+      createParsedFile('service', 'order-service', { id: 'order-service', version: '1.0.0' }),
+      createParsedFile('entity', 'order', { id: 'order', version: '1.0.0' }),
     ];
 
     const errors = validateReferences(parsedFiles);
+    expect(errors).toHaveLength(0);
+  });
+
+  it('should use frontmatter.id for service references when different from file path', () => {
+    const parsedFiles: ParsedFile[] = [
+      createParsedFile('domain', 'sales', {
+        version: '1.0.0',
+        services: [{ id: 'order-service' }], // References frontmatter.id (kebab-case)
+      }),
+      // file.resourceId is 'OrderService' (SentenceCase), but frontmatter.id is 'order-service' (kebab-case)
+      createParsedFile('service', 'OrderService', { id: 'order-service', version: '1.0.0' }),
+    ];
+
+    const errors = validateReferences(parsedFiles);
+    // Should pass because frontmatter.id matches the reference
     expect(errors).toHaveLength(0);
   });
 
@@ -71,10 +107,11 @@ describe('validateReferences', () => {
   it('should report errors for wrong version references', () => {
     const parsedFiles: ParsedFile[] = [
       createParsedFile('service', 'user-service', {
+        id: 'user-service',
         version: '1.0.0',
         sends: [{ id: 'user-created', version: '2.0.0' }],
       }),
-      createParsedFile('event', 'user-created', { version: '1.0.0' }),
+      createParsedFile('event', 'user-created', { id: 'user-created', version: '1.0.0' }),
     ];
 
     const errors = validateReferences(parsedFiles);
@@ -85,10 +122,11 @@ describe('validateReferences', () => {
   it('should check message references in multiple types', () => {
     const parsedFiles: ParsedFile[] = [
       createParsedFile('service', 'user-service', {
+        id: 'user-service',
         version: '1.0.0',
         sends: [{ id: 'user-updated' }],
       }),
-      createParsedFile('event', 'user-updated', { version: '1.0.0' }),
+      createParsedFile('event', 'user-updated', { id: 'user-updated', version: '1.0.0' }),
     ];
 
     const errors = validateReferences(parsedFiles);
@@ -112,7 +150,7 @@ describe('validateReferences', () => {
           },
         ],
       }),
-      createParsedFile('command', 'create-user', { version: '1.0.0' }),
+      createParsedFile('command', 'create-user', { id: 'create-user', version: '1.0.0' }),
     ];
 
     const errors = validateReferences(parsedFiles);
@@ -123,6 +161,7 @@ describe('validateReferences', () => {
   it('should validate owner references', () => {
     const parsedFiles: ParsedFile[] = [
       createParsedFile('service', 'user-service', {
+        id: 'user-service',
         version: '1.0.0',
         owners: ['john-doe', 'platform-team'],
       }),
@@ -183,11 +222,12 @@ describe('validateReferences', () => {
     it('should support "latest" version references', () => {
       const parsedFiles: ParsedFile[] = [
         createParsedFile('service', 'inventory-service', {
+          id: 'inventory-service',
           version: '1.0.0',
           sends: [{ id: 'OutOfStock', version: 'latest' }],
         }),
-        createParsedFile('event', 'OutOfStock', { version: '2.0.0' }),
-        createParsedFile('event', 'OutOfStock', { version: '1.5.0' }),
+        createParsedFile('event', 'OutOfStock', { id: 'OutOfStock', version: '2.0.0' }),
+        createParsedFile('event', 'OutOfStock', { id: 'OutOfStock', version: '1.5.0' }),
       ];
 
       const errors = validateReferences(parsedFiles);
@@ -197,11 +237,12 @@ describe('validateReferences', () => {
     it('should support x-pattern version matching like "0.0.x"', () => {
       const parsedFiles: ParsedFile[] = [
         createParsedFile('service', 'inventory-service', {
+          id: 'inventory-service',
           version: '1.0.0',
           sends: [{ id: 'GetInventoryList', version: '0.0.x' }],
         }),
-        createParsedFile('command', 'GetInventoryList', { version: '0.0.1' }),
-        createParsedFile('command', 'GetInventoryList', { version: '0.0.5' }),
+        createParsedFile('command', 'GetInventoryList', { id: 'GetInventoryList', version: '0.0.1' }),
+        createParsedFile('command', 'GetInventoryList', { id: 'GetInventoryList', version: '0.0.5' }),
       ];
 
       const errors = validateReferences(parsedFiles);
@@ -211,11 +252,12 @@ describe('validateReferences', () => {
     it('should support semver range patterns like "^1.0.0"', () => {
       const parsedFiles: ParsedFile[] = [
         createParsedFile('service', 'user-service', {
+          id: 'user-service',
           version: '1.0.0',
           sends: [{ id: 'UserCreated', version: '^1.0.0' }],
         }),
-        createParsedFile('event', 'UserCreated', { version: '1.2.0' }),
-        createParsedFile('event', 'UserCreated', { version: '1.0.5' }),
+        createParsedFile('event', 'UserCreated', { id: 'UserCreated', version: '1.2.0' }),
+        createParsedFile('event', 'UserCreated', { id: 'UserCreated', version: '1.0.5' }),
       ];
 
       const errors = validateReferences(parsedFiles);
@@ -225,10 +267,11 @@ describe('validateReferences', () => {
     it('should support tilde range patterns like "~1.2.0"', () => {
       const parsedFiles: ParsedFile[] = [
         createParsedFile('service', 'user-service', {
+          id: 'user-service',
           version: '1.0.0',
           sends: [{ id: 'UserUpdated', version: '~1.2.0' }],
         }),
-        createParsedFile('event', 'UserUpdated', { version: '1.2.3' }),
+        createParsedFile('event', 'UserUpdated', { id: 'UserUpdated', version: '1.2.3' }),
       ];
 
       const errors = validateReferences(parsedFiles);
@@ -238,11 +281,12 @@ describe('validateReferences', () => {
     it('should reject invalid version patterns', () => {
       const parsedFiles: ParsedFile[] = [
         createParsedFile('service', 'inventory-service', {
+          id: 'inventory-service',
           version: '1.0.0',
           sends: [{ id: 'GetInventoryList', version: '0.1.x' }], // No 0.1.x available
         }),
-        createParsedFile('command', 'GetInventoryList', { version: '0.0.1' }),
-        createParsedFile('command', 'GetInventoryList', { version: '0.2.1' }),
+        createParsedFile('command', 'GetInventoryList', { id: 'GetInventoryList', version: '0.0.1' }),
+        createParsedFile('command', 'GetInventoryList', { id: 'GetInventoryList', version: '0.2.1' }),
       ];
 
       const errors = validateReferences(parsedFiles);
@@ -253,11 +297,12 @@ describe('validateReferences', () => {
     it('should reject semver patterns that do not match any available versions', () => {
       const parsedFiles: ParsedFile[] = [
         createParsedFile('service', 'user-service', {
+          id: 'user-service',
           version: '1.0.0',
           sends: [{ id: 'UserCreated', version: '^2.0.0' }], // No 2.x versions available
         }),
-        createParsedFile('event', 'UserCreated', { version: '1.2.0' }),
-        createParsedFile('event', 'UserCreated', { version: '1.5.0' }),
+        createParsedFile('event', 'UserCreated', { id: 'UserCreated', version: '1.2.0' }),
+        createParsedFile('event', 'UserCreated', { id: 'UserCreated', version: '1.5.0' }),
       ];
 
       const errors = validateReferences(parsedFiles);
@@ -268,10 +313,11 @@ describe('validateReferences', () => {
     it('should handle resources with "latest" version when requested with patterns', () => {
       const parsedFiles: ParsedFile[] = [
         createParsedFile('service', 'inventory-service', {
+          id: 'inventory-service',
           version: '1.0.0',
           sends: [{ id: 'StockUpdate', version: '^1.0.0' }],
         }),
-        createParsedFile('event', 'StockUpdate', {}), // No version specified, defaults to 'latest'
+        createParsedFile('event', 'StockUpdate', { id: 'StockUpdate' }), // No version specified, defaults to 'latest'
       ];
 
       const errors = validateReferences(parsedFiles);
@@ -281,10 +327,11 @@ describe('validateReferences', () => {
     it('should allow exact version matches even when semver patterns fail', () => {
       const parsedFiles: ParsedFile[] = [
         createParsedFile('service', 'inventory-service', {
+          id: 'inventory-service',
           version: '1.0.0',
           sends: [{ id: 'OutOfStock', version: '1.0.0' }], // Exact match
         }),
-        createParsedFile('event', 'OutOfStock', { version: '1.0.0' }),
+        createParsedFile('event', 'OutOfStock', { id: 'OutOfStock', version: '1.0.0' }),
       ];
 
       const errors = validateReferences(parsedFiles);
@@ -305,7 +352,7 @@ describe('validateReferences', () => {
         }),
         createParsedFile('domain', 'orders', { version: '1.0.0' }),
         createParsedFile('domain', 'payments', { version: '2.0.0' }),
-        createParsedFile('service', 'user-service', { version: '1.0.0' }),
+        createParsedFile('service', 'user-service', { id: 'user-service', version: '1.0.0' }),
       ];
 
       const errors = validateReferences(parsedFiles);
@@ -380,7 +427,7 @@ describe('validateReferences', () => {
         createParsedFile('domain', 'analytics', { version: '1.0.0' }),
         createParsedFile('domain', 'orders', { version: '1.0.0' }),
         createParsedFile('domain', 'payments', { version: '1.0.0' }),
-        createParsedFile('service', 'user-service', { version: '1.0.0' }),
+        createParsedFile('service', 'user-service', { id: 'user-service', version: '1.0.0' }),
       ];
 
       const errors = validateReferences(parsedFiles);
