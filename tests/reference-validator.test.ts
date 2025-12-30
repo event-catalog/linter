@@ -37,6 +37,22 @@ describe('buildResourceIndex', () => {
     expect(index.user['john-doe']).toBeDefined();
   });
 
+  it('should fall back to file.resourceId when frontmatter.id is not defined', () => {
+    const parsedFiles: ParsedFile[] = [
+      // No frontmatter.id, should use file.resourceId from path
+      createParsedFile('service', 'user-service', { version: '1.0.0' }),
+      createParsedFile('event', 'order-created', { version: '2.0.0' }),
+    ];
+
+    const index = buildResourceIndex(parsedFiles);
+
+    // Should use file.resourceId when frontmatter.id is not present
+    expect(index.service['user-service']).toBeDefined();
+    expect(index.service['user-service'].has('1.0.0')).toBe(true);
+    expect(index.event['order-created']).toBeDefined();
+    expect(index.event['order-created'].has('2.0.0')).toBe(true);
+  });
+
   it('should use frontmatter.id for services/events/channels when different from file path', () => {
     const parsedFiles: ParsedFile[] = [
       // file.resourceId from path is 'UserService' (SentenceCase), but frontmatter.id is 'user-service' (kebab-case)
