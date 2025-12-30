@@ -37,12 +37,14 @@ describe('buildResourceIndex', () => {
     expect(index.user['john-doe']).toBeDefined();
   });
 
-  it('should use frontmatter.id for events/services/channels when different from file path', () => {
+  it('should use frontmatter.id for services/events/channels when different from file path', () => {
     const parsedFiles: ParsedFile[] = [
       // file.resourceId from path is 'UserService' (SentenceCase), but frontmatter.id is 'user-service' (kebab-case)
       createParsedFile('service', 'UserService', { id: 'user-service', version: '1.0.0' }),
       // file.resourceId from path is 'UserCreated' (SentenceCase), but frontmatter.id is 'user-created' (kebab-case)
       createParsedFile('event', 'UserCreated', { id: 'user-created', version: '1.0.0' }),
+      // file.resourceId from path is 'OrderCreatedChannel' (SentenceCase), but frontmatter.id is 'order-created-channel' (kebab-case)
+      createParsedFile('channel', 'OrderCreatedChannel', { id: 'order-created-channel', version: '1.0.0' }),
     ];
 
     const index = buildResourceIndex(parsedFiles);
@@ -52,10 +54,66 @@ describe('buildResourceIndex', () => {
     expect(index.service['user-service'].has('1.0.0')).toBe(true);
     expect(index.event['user-created']).toBeDefined();
     expect(index.event['user-created'].has('1.0.0')).toBe(true);
+    expect(index.channel['order-created-channel']).toBeDefined();
+    expect(index.channel['order-created-channel'].has('1.0.0')).toBe(true);
     
     // Should NOT have entries for the path-based IDs
     expect(index.service['UserService']).toBeUndefined();
     expect(index.event['UserCreated']).toBeUndefined();
+    expect(index.channel['OrderCreatedChannel']).toBeUndefined();
+  });
+
+  it('should use frontmatter.id for commands/queries when different from file path', () => {
+    const parsedFiles: ParsedFile[] = [
+      // file.resourceId from path is 'CreateUser' (SentenceCase), but frontmatter.id is 'create-user' (kebab-case)
+      createParsedFile('command', 'CreateUser', { id: 'create-user', version: '1.0.0' }),
+      // file.resourceId from path is 'GetUserProfile' (SentenceCase), but frontmatter.id is 'get-user-profile' (kebab-case)
+      createParsedFile('query', 'GetUserProfile', { id: 'get-user-profile', version: '1.0.0' }),
+    ];
+
+    const index = buildResourceIndex(parsedFiles);
+
+    // Should use frontmatter.id, not file.resourceId
+    expect(index.command['create-user']).toBeDefined();
+    expect(index.command['create-user'].has('1.0.0')).toBe(true);
+    expect(index.query['get-user-profile']).toBeDefined();
+    expect(index.query['get-user-profile'].has('1.0.0')).toBe(true);
+    
+    // Should NOT have entries for the path-based IDs
+    expect(index.command['CreateUser']).toBeUndefined();
+    expect(index.query['GetUserProfile']).toBeUndefined();
+  });
+
+  it('should use frontmatter.id for entities when different from file path', () => {
+    const parsedFiles: ParsedFile[] = [
+      // file.resourceId from path is 'UserEntity' (SentenceCase), but frontmatter.id is 'user-entity' (kebab-case)
+      createParsedFile('entity', 'UserEntity', { id: 'user-entity', version: '1.0.0' }),
+    ];
+
+    const index = buildResourceIndex(parsedFiles);
+
+    // Should use frontmatter.id, not file.resourceId
+    expect(index.entity['user-entity']).toBeDefined();
+    expect(index.entity['user-entity'].has('1.0.0')).toBe(true);
+    
+    // Should NOT have entries for the path-based IDs
+    expect(index.entity['UserEntity']).toBeUndefined();
+  });
+
+  it('should use frontmatter.id for flows when different from file path', () => {
+    const parsedFiles: ParsedFile[] = [
+      // file.resourceId from path is 'OrderFlow' (SentenceCase), but frontmatter.id is 'order-flow' (kebab-case)
+      createParsedFile('flow', 'OrderFlow', { id: 'order-flow', version: '1.0.0' }),
+    ];
+
+    const index = buildResourceIndex(parsedFiles);
+
+    // Should use frontmatter.id, not file.resourceId
+    expect(index.flow['order-flow']).toBeDefined();
+    expect(index.flow['order-flow'].has('1.0.0')).toBe(true);
+    
+    // Should NOT have entries for the path-based IDs
+    expect(index.flow['OrderFlow']).toBeUndefined();
   });
 });
 
@@ -83,6 +141,42 @@ describe('validateReferences', () => {
       }),
       // file.resourceId is 'OrderService' (SentenceCase), but frontmatter.id is 'order-service' (kebab-case)
       createParsedFile('service', 'OrderService', { id: 'order-service', version: '1.0.0' }),
+    ];
+
+    const errors = validateReferences(parsedFiles);
+    // Should pass because frontmatter.id matches the reference
+    expect(errors).toHaveLength(0);
+  });
+
+  it('should use frontmatter.id for entity references when different from file path', () => {
+    const parsedFiles: ParsedFile[] = [
+      createParsedFile('domain', 'sales', {
+        version: '1.0.0',
+        entities: [{ id: 'order-entity', version: '1.0.0' }], // References frontmatter.id (kebab-case)
+      }),
+      // file.resourceId is 'OrderEntity' (SentenceCase), but frontmatter.id is 'order-entity' (kebab-case)
+      createParsedFile('entity', 'OrderEntity', { id: 'order-entity', version: '1.0.0' }),
+    ];
+
+    const errors = validateReferences(parsedFiles);
+    // Should pass because frontmatter.id matches the reference
+    expect(errors).toHaveLength(0);
+  });
+
+  it('should use frontmatter.id for entity property references when different from file path', () => {
+    const parsedFiles: ParsedFile[] = [
+      createParsedFile('entity', 'user-entity', {
+        id: 'user-entity',
+        version: '1.0.0',
+        properties: [
+          {
+            name: 'address',
+            references: 'address-entity', // References frontmatter.id (kebab-case)
+          },
+        ],
+      }),
+      // file.resourceId is 'AddressEntity' (SentenceCase), but frontmatter.id is 'address-entity' (kebab-case)
+      createParsedFile('entity', 'AddressEntity', { id: 'address-entity', version: '1.0.0' }),
     ];
 
     const errors = validateReferences(parsedFiles);
@@ -133,6 +227,38 @@ describe('validateReferences', () => {
     expect(errors).toHaveLength(0);
   });
 
+  it('should use frontmatter.id for command references when different from file path', () => {
+    const parsedFiles: ParsedFile[] = [
+      createParsedFile('service', 'user-service', {
+        id: 'user-service',
+        version: '1.0.0',
+        receives: [{ id: 'create-user' }], // References frontmatter.id (kebab-case)
+      }),
+      // file.resourceId is 'CreateUser' (SentenceCase), but frontmatter.id is 'create-user' (kebab-case)
+      createParsedFile('command', 'CreateUser', { id: 'create-user', version: '1.0.0' }),
+    ];
+
+    const errors = validateReferences(parsedFiles);
+    // Should pass because frontmatter.id matches the reference
+    expect(errors).toHaveLength(0);
+  });
+
+  it('should use frontmatter.id for query references when different from file path', () => {
+    const parsedFiles: ParsedFile[] = [
+      createParsedFile('service', 'user-service', {
+        id: 'user-service',
+        version: '1.0.0',
+        receives: [{ id: 'get-user-profile' }], // References frontmatter.id (kebab-case)
+      }),
+      // file.resourceId is 'GetUserProfile' (SentenceCase), but frontmatter.id is 'get-user-profile' (kebab-case)
+      createParsedFile('query', 'GetUserProfile', { id: 'get-user-profile', version: '1.0.0' }),
+    ];
+
+    const errors = validateReferences(parsedFiles);
+    // Should pass because frontmatter.id matches the reference
+    expect(errors).toHaveLength(0);
+  });
+
   it('should validate flow step references', () => {
     const parsedFiles: ParsedFile[] = [
       createParsedFile('flow', 'user-registration', {
@@ -156,6 +282,50 @@ describe('validateReferences', () => {
     const errors = validateReferences(parsedFiles);
     expect(errors).toHaveLength(1);
     expect(errors[0].field).toContain('steps[1].service');
+  });
+
+  it('should use frontmatter.id for flow step message references when different from file path', () => {
+    const parsedFiles: ParsedFile[] = [
+      createParsedFile('flow', 'order-flow', {
+        id: 'order-flow',
+        version: '1.0.0',
+        steps: [
+          {
+            id: 'step1',
+            title: 'Create order',
+            message: { id: 'order-created', version: '1.0.0' }, // References frontmatter.id (kebab-case)
+          },
+        ],
+      }),
+      // file.resourceId is 'OrderCreated' (SentenceCase), but frontmatter.id is 'order-created' (kebab-case)
+      createParsedFile('event', 'OrderCreated', { id: 'order-created', version: '1.0.0' }),
+    ];
+
+    const errors = validateReferences(parsedFiles);
+    // Should pass because frontmatter.id matches the reference
+    expect(errors).toHaveLength(0);
+  });
+
+  it('should use frontmatter.id for flow step service references when different from file path', () => {
+    const parsedFiles: ParsedFile[] = [
+      createParsedFile('flow', 'order-flow', {
+        id: 'order-flow',
+        version: '1.0.0',
+        steps: [
+          {
+            id: 'step1',
+            title: 'Process order',
+            service: { id: 'order-service', version: '1.0.0' }, // References frontmatter.id (kebab-case)
+          },
+        ],
+      }),
+      // file.resourceId is 'OrderService' (SentenceCase), but frontmatter.id is 'order-service' (kebab-case)
+      createParsedFile('service', 'OrderService', { id: 'order-service', version: '1.0.0' }),
+    ];
+
+    const errors = validateReferences(parsedFiles);
+    // Should pass because frontmatter.id matches the reference
+    expect(errors).toHaveLength(0);
   });
 
   it('should validate owner references', () => {
