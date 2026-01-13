@@ -16,15 +16,13 @@ export const buildResourceIndex = (parsedFiles: ParsedFile[]): ResourceIndex => 
     const { file, frontmatter } = parsedFile;
     const { resourceType } = file;
 
-    // For users, teams, and domains, use the frontmatter id field instead of filename/directory
-    // This handles cases where filename is "aSmith.mdx" but frontmatter has id: "asmith"
-    // And where directory is "e-commerce" but frontmatter has id: "E-Commerce"
+    // Use the frontmatter id field if present, otherwise fall back to filename/directory
+    // This handles cases where:
+    // - Filename is "aSmith.mdx" but frontmatter has id: "asmith"
+    // - Directory is "e-commerce" but frontmatter has id: "E-Commerce"
+    // - Directory is "UserService" but frontmatter has id: "user-service" (SentenceCase vs kebab-case)
     let resourceId = file.resourceId;
-    if (
-      (resourceType === 'user' || resourceType === 'team' || resourceType === 'domain') &&
-      frontmatter.id &&
-      typeof frontmatter.id === 'string'
-    ) {
+    if (frontmatter.id && typeof frontmatter.id === 'string') {
       resourceId = frontmatter.id;
     }
 
