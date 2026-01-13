@@ -8,6 +8,7 @@ jobs:
     permissions:
       contents: write
       pull-requests: write
+      id-token: write
     runs-on: ubuntu-latest
     if: github.repository == 'event-catalog/linter'
     steps:
