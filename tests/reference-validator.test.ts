@@ -72,7 +72,7 @@ describe('buildResourceIndex', () => {
     expect(index.event['user-created'].has('1.0.0')).toBe(true);
     expect(index.channel['order-created-channel']).toBeDefined();
     expect(index.channel['order-created-channel'].has('1.0.0')).toBe(true);
-    
+
     // Should NOT have entries for the path-based IDs
     expect(index.service['UserService']).toBeUndefined();
     expect(index.event['UserCreated']).toBeUndefined();
@@ -94,7 +94,7 @@ describe('buildResourceIndex', () => {
     expect(index.command['create-user'].has('1.0.0')).toBe(true);
     expect(index.query['get-user-profile']).toBeDefined();
     expect(index.query['get-user-profile'].has('1.0.0')).toBe(true);
-    
+
     // Should NOT have entries for the path-based IDs
     expect(index.command['CreateUser']).toBeUndefined();
     expect(index.query['GetUserProfile']).toBeUndefined();
@@ -111,7 +111,7 @@ describe('buildResourceIndex', () => {
     // Should use frontmatter.id, not file.resourceId
     expect(index.entity['user-entity']).toBeDefined();
     expect(index.entity['user-entity'].has('1.0.0')).toBe(true);
-    
+
     // Should NOT have entries for the path-based IDs
     expect(index.entity['UserEntity']).toBeUndefined();
   });
@@ -127,7 +127,7 @@ describe('buildResourceIndex', () => {
     // Should use frontmatter.id, not file.resourceId
     expect(index.flow['order-flow']).toBeDefined();
     expect(index.flow['order-flow'].has('1.0.0')).toBe(true);
-    
+
     // Should NOT have entries for the path-based IDs
     expect(index.flow['OrderFlow']).toBeUndefined();
   });
