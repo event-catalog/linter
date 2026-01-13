@@ -16,18 +16,24 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Use Node.js 20.x
+      - name: Setup pnpm
         uses: pnpm/action-setup@v4
+
+      - name: Use Node.js 24.x
+        uses: actions/setup-node@v4
         with:
-          version: 8
+          node-version: 24.x
+          cache: 'pnpm'
+
       - name: Installation
-        run: pnpm install
+        run: pnpm i
+
       - name: Build
         run: pnpm run build
       - name: Create Release Pull Request or Publish to npm
         uses: changesets/action@v1
         with:
           publish: pnpm run release
+          createGithubReleases: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          NPM_TOKEN: ${{ secrets.NPM_AUTH_TOKEN }}
