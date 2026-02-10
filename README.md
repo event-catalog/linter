@@ -207,23 +207,32 @@ module.exports = {
 
 ### Available Rules
 
-| Rule Name                         | Description                                                                | Accepted Values        | Default        |
-| --------------------------------- | -------------------------------------------------------------------------- | ---------------------- | -------------- |
-| **Schema Validation Rules**       |
-| `schema/required-fields`          | Validates that required fields are present in frontmatter                  | `error`, `warn`, `off` | `error`        |
-| `schema/valid-type`               | Validates that field types are correct (strings, arrays, objects)          | `error`, `warn`, `off` | `error`        |
-| `schema/valid-semver`             | Validates semantic version format (1.0.0, 2.1.3-beta)                      | `error`, `warn`, `off` | `error`        |
-| `schema/valid-email`              | Validates email address format in user frontmatter                         | `error`, `warn`, `off` | `error`        |
-| `schema/validation-error`         | General schema validation errors                                           | `error`, `warn`, `off` | `error`        |
-| **Reference Validation Rules**    |
-| `refs/owner-exists`               | Ensures referenced owners (users/teams) exist                              | `error`, `warn`, `off` | `error`        |
-| `refs/valid-version-range`        | Validates version references and patterns                                  | `error`, `warn`, `off` | `error`        |
-| `refs/resource-exists`            | Ensures referenced resources exist (always enabled for critical resources) | Always enabled         | Always enabled |
-| **Best Practice Rules**           |
-| `best-practices/summary-required` | Requires summary field for better documentation                            | `error`, `warn`, `off` | `error`        |
-| `best-practices/owner-required`   | Requires at least one owner for accountability                             | `error`, `warn`, `off` | `error`        |
+| Rule Name                             | Description                                                       | Accepted Values        | Default |
+| ------------------------------------- | ----------------------------------------------------------------- | ---------------------- | ------- |
+| **Schema Validation Rules**           |
+| `schema/required-fields`              | Validates that required fields are present in frontmatter         | `error`, `warn`, `off` | `error` |
+| `schema/valid-type`                   | Validates that field types are correct (strings, arrays, objects) | `error`, `warn`, `off` | `error` |
+| `schema/valid-semver`                 | Validates semantic version format (1.0.0, 2.1.3-beta)             | `error`, `warn`, `off` | `error` |
+| `schema/valid-email`                  | Validates email address format in user frontmatter                | `error`, `warn`, `off` | `error` |
+| `schema/validation-error`             | General schema validation errors                                  | `error`, `warn`, `off` | `error` |
+| **Reference Validation Rules**        |
+| `refs/owner-exists`                   | Ensures referenced owners (users/teams) exist                     | `error`, `warn`, `off` | `error` |
+| `refs/valid-version-range`            | Validates version references and patterns                         | `error`, `warn`, `off` | `error` |
+| `refs/resource-exists`                | Ensures referenced resources exist                                | `error`, `warn`, `off` | `error` |
+| `refs/channel-exists`                 | Ensures channels referenced in sends/receives `to`/`from` exist   | `error`, `warn`, `off` | `error` |
+| `refs/container-exists`               | Ensures containers referenced in `writesTo`/`readsFrom` exist     | `error`, `warn`, `off` | `error` |
+| `refs/orphan-messages`                | Detects events/commands/queries with no producer and no consumer  | `error`, `warn`, `off` | `warn`  |
+| **Best Practice Rules**               |
+| `best-practices/summary-required`     | Requires summary field for better documentation                   | `error`, `warn`, `off` | `error` |
+| `best-practices/owner-required`       | Requires at least one owner for accountability                    | `error`, `warn`, `off` | `error` |
+| `best-practices/description-required` | Requires markdown body content beyond just frontmatter            | `error`, `warn`, `off` | `warn`  |
+| `best-practices/schema-required`      | Requires `schemaPath` on events, commands, and queries            | `error`, `warn`, `off` | `warn`  |
+| **Versioning Rules**                  |
+| `versions/no-deprecated-references`   | Warns when referencing a deprecated resource                      | `error`, `warn`, `off` | `warn`  |
+| **Structural Rules**                  |
+| `structure/duplicate-resource-ids`    | Detects duplicate resources with same type, id, and version       | `error`, `warn`, `off` | `error` |
 
-**Note**: Core resource reference validation (services, domains, entities) is always enabled and cannot be disabled, ensuring referential integrity of your EventCatalog.
+**Note**: Rules defaulting to `warn` will show warnings but won't fail the linter unless `--fail-on-warning` is used. You can promote them to `error` for stricter validation.
 
 ### Configuration Examples
 
@@ -326,10 +335,20 @@ If no `.eventcatalogrc.js` file is found, the linter uses default rules where al
 - ✅ Services referenced in domains exist
 - ✅ Events/Commands/Queries referenced in services exist
 - ✅ Entities referenced in domains/services exist
+- ✅ Channels referenced in sends/receives `to`/`from` exist
+- ✅ Containers referenced in `writesTo`/`readsFrom` exist
 - ✅ Users/Teams referenced as owners exist
 - ✅ Flow steps reference existing services/messages
 - ✅ Entity properties reference existing entities
 - ✅ Version-specific references are valid
+- ✅ Orphan messages (no producer and no consumer) are detected
+- ✅ References to deprecated resources are flagged
+- ✅ Duplicate resource IDs (same type, id, and version) are detected
+
+### Documentation Quality
+
+- ✅ Resources have markdown body content (not just frontmatter)
+- ✅ Events/Commands/Queries have a `schemaPath` defined
 
 ### Example EventCatalog Structure
 
@@ -641,11 +660,24 @@ The linter provides descriptive rule names in parentheses to help identify and f
 - `(refs/owner-exists)` - Referenced owner (user/team) doesn't exist
 - `(refs/valid-version-range)` - Referenced version doesn't exist or invalid pattern
 - `(refs/resource-exists)` - Referenced resource doesn't exist
+- `(refs/channel-exists)` - Referenced channel in sends/receives to/from doesn't exist
+- `(refs/container-exists)` - Referenced container in writesTo/readsFrom doesn't exist
+- `(refs/orphan-messages)` - Event/command/query has no producer and no consumer
 
 ### Best Practice Rules
 
 - `(best-practices/summary-required)` - Summary field is missing
 - `(best-practices/owner-required)` - At least one owner is required
+- `(best-practices/description-required)` - Markdown body content is missing
+- `(best-practices/schema-required)` - schemaPath is missing on event/command/query
+
+### Versioning Rules
+
+- `(versions/no-deprecated-references)` - Referencing a deprecated resource
+
+### Structural Rules
+
+- `(structure/duplicate-resource-ids)` - Duplicate resource with same type, id, and version
 
 ### Parse Errors
 
