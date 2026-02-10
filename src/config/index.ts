@@ -28,12 +28,20 @@ export const DEFAULT_RULES: Record<string, RuleSeverity> = {
   'schema/valid-email': 'error',
   'refs/owner-exists': 'error',
   'refs/valid-version-range': 'error',
+  'refs/resource-exists': 'error',
+  'refs/channel-exists': 'error',
+  'refs/container-exists': 'error',
+  'refs/orphan-messages': 'warn',
   'best-practices/summary-required': 'error',
   'best-practices/owner-required': 'error',
+  'best-practices/description-required': 'warn',
+  'best-practices/schema-required': 'warn',
   'naming/service-id-format': 'error',
   'naming/event-id-format': 'error',
   'versions/consistent-format': 'error',
   'versions/no-deprecated': 'error',
+  'versions/no-deprecated-references': 'warn',
+  'structure/duplicate-resource-ids': 'error',
 };
 
 export interface DependencyEntry {
@@ -203,6 +211,11 @@ export const applyRuleSeverity = (errors: ValidationError[], rules: Record<strin
 };
 
 const mapErrorToRuleName = (error: ValidationError): string => {
+  // Use explicit rule if set by the validator
+  if (error.rule) {
+    return error.rule;
+  }
+
   // Map validation errors to rule names based on the error type and content
   if (error.type === 'schema') {
     // Check field-specific rules first
@@ -234,8 +247,7 @@ const mapErrorToRuleName = (error: ValidationError): string => {
     if (error.message.includes('version')) {
       return 'refs/valid-version-range';
     }
-    // Service, domain, entity, and other references are always validated and not configurable
-    return 'schema/required-fields'; // Map to a default rule so they remain as errors
+    return 'refs/resource-exists';
   }
 
   return 'schema/required-fields';

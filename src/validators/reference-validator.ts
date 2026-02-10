@@ -157,6 +157,16 @@ const extractReferences = (parsedFile: ParsedFile): ReferenceInfo[] => {
         references.push({ ref, possibleTypes: ['entity'], field: 'entities' });
       });
     }
+    if (frontmatter.writesTo && Array.isArray(frontmatter.writesTo)) {
+      frontmatter.writesTo.forEach((ref: ResourceReference) => {
+        references.push({ ref, possibleTypes: ['dataStore'], field: 'writesTo' });
+      });
+    }
+    if (frontmatter.readsFrom && Array.isArray(frontmatter.readsFrom)) {
+      frontmatter.readsFrom.forEach((ref: ResourceReference) => {
+        references.push({ ref, possibleTypes: ['dataStore'], field: 'readsFrom' });
+      });
+    }
   }
 
   if (file.resourceType === 'flow' && frontmatter.steps && Array.isArray(frontmatter.steps)) {
@@ -201,6 +211,53 @@ const extractReferences = (parsedFile: ParsedFile): ReferenceInfo[] => {
   return references;
 };
 
+// Extract channel references from sends/receives to/from arrays
+const extractChannelReferences = (parsedFile: ParsedFile): ReferenceInfo[] => {
+  const { file, frontmatter } = parsedFile;
+  const references: ReferenceInfo[] = [];
+
+  if (file.resourceType !== 'service' && file.resourceType !== 'domain') {
+    return references;
+  }
+
+  const extractFromPointers = (pointers: any[], parentField: string) => {
+    if (!Array.isArray(pointers)) return;
+    pointers.forEach((pointer: any, idx: number) => {
+      if (pointer.to && Array.isArray(pointer.to)) {
+        pointer.to.forEach((channelRef: any, cIdx: number) => {
+          if (channelRef && channelRef.id) {
+            references.push({
+              ref: { id: channelRef.id, version: channelRef.version },
+              possibleTypes: ['channel'],
+              field: `${parentField}[${idx}].to[${cIdx}]`,
+            });
+          }
+        });
+      }
+      if (pointer.from && Array.isArray(pointer.from)) {
+        pointer.from.forEach((channelRef: any, cIdx: number) => {
+          if (channelRef && channelRef.id) {
+            references.push({
+              ref: { id: channelRef.id, version: channelRef.version },
+              possibleTypes: ['channel'],
+              field: `${parentField}[${idx}].from[${cIdx}]`,
+            });
+          }
+        });
+      }
+    });
+  };
+
+  if (frontmatter.sends && Array.isArray(frontmatter.sends)) {
+    extractFromPointers(frontmatter.sends, 'sends');
+  }
+  if (frontmatter.receives && Array.isArray(frontmatter.receives)) {
+    extractFromPointers(frontmatter.receives, 'receives');
+  }
+
+  return references;
+};
+
 export const validateReferences = (parsedFiles: ParsedFile[], dependencies?: CatalogDependencies): ValidationError[] => {
   const index = buildResourceIndex(parsedFiles, dependencies);
   const errors: ValidationError[] = [];
@@ -218,6 +275,8 @@ export const validateReferences = (parsedFiles: ParsedFile[], dependencies?: Cat
         let rule = 'refs/resource-exists';
         if (field === 'owners') {
           rule = 'refs/owner-exists';
+        } else if (field === 'writesTo' || field === 'readsFrom') {
+          rule = 'refs/container-exists';
         } else if (ref.version) {
           rule = 'refs/valid-version-range';
         }
@@ -231,6 +290,193 @@ export const validateReferences = (parsedFiles: ParsedFile[], dependencies?: Cat
           rule,
         });
       }
+    }
+
+    // Validate channel references from sends/receives to/from
+    const channelRefs = extractChannelReferences(parsedFile);
+    for (const { ref, possibleTypes, field } of channelRefs) {
+      const found = possibleTypes.some((type) => checkResourceExists(ref, type, index));
+
+      if (!found) {
+        const versionStr = ref.version ? ` (version: ${ref.version})` : '';
+        errors.push({
+          type: 'reference',
+          resource: `${parsedFile.file.resourceType}/${parsedFile.file.resourceId}`,
+          field,
+          message: `Referenced channel "${ref.id}"${versionStr} does not exist`,
+          file: parsedFile.file.relativePath,
+          rule: 'refs/channel-exists',
+        });
+      }
+    }
+  }
+
+  return errors;
+};
+
+// Detect messages (events/commands/queries) with no producer and no consumer
+export const validateOrphanMessages = (parsedFiles: ParsedFile[], dependencies?: CatalogDependencies): ValidationError[] => {
+  const errors: ValidationError[] = [];
+  const messageTypes: ResourceType[] = ['event', 'command', 'query'];
+
+  // Collect all message IDs
+  const messageFiles = parsedFiles.filter((pf) => messageTypes.includes(pf.file.resourceType));
+
+  if (messageFiles.length === 0) return errors;
+
+  // Build sets of produced and consumed message IDs
+  const producedMessages = new Set<string>();
+  const consumedMessages = new Set<string>();
+
+  for (const parsedFile of parsedFiles) {
+    const { file, frontmatter } = parsedFile;
+
+    if (file.resourceType === 'service' || file.resourceType === 'domain') {
+      if (frontmatter.sends && Array.isArray(frontmatter.sends)) {
+        frontmatter.sends.forEach((ref: any) => {
+          if (ref && ref.id) producedMessages.add(ref.id);
+        });
+      }
+      if (frontmatter.receives && Array.isArray(frontmatter.receives)) {
+        frontmatter.receives.forEach((ref: any) => {
+          if (ref && ref.id) consumedMessages.add(ref.id);
+        });
+      }
+    }
+
+    // Also check producers/consumers fields on messages themselves
+    if (messageTypes.includes(file.resourceType)) {
+      if (frontmatter.producers && Array.isArray(frontmatter.producers) && frontmatter.producers.length > 0) {
+        const msgId = (frontmatter.id as string) || file.resourceId;
+        producedMessages.add(msgId);
+      }
+      if (frontmatter.consumers && Array.isArray(frontmatter.consumers) && frontmatter.consumers.length > 0) {
+        const msgId = (frontmatter.id as string) || file.resourceId;
+        consumedMessages.add(msgId);
+      }
+    }
+  }
+
+  // Also consider dependency messages as having producers/consumers
+  if (dependencies) {
+    for (const [type, entries] of Object.entries(dependencies)) {
+      if (messageTypes.includes(type as ResourceType)) {
+        entries.forEach((entry) => {
+          // Dependencies are external, treat them as having both producers and consumers
+          producedMessages.add(entry.id);
+          consumedMessages.add(entry.id);
+        });
+      }
+    }
+  }
+
+  // Check each message for orphan status
+  for (const parsedFile of messageFiles) {
+    const msgId = (parsedFile.frontmatter.id as string) || parsedFile.file.resourceId;
+    const isProduced = producedMessages.has(msgId);
+    const isConsumed = consumedMessages.has(msgId);
+
+    if (!isProduced && !isConsumed) {
+      errors.push({
+        type: 'reference',
+        resource: `${parsedFile.file.resourceType}/${parsedFile.file.resourceId}`,
+        field: 'id',
+        message: `${parsedFile.file.resourceType} "${msgId}" has no producer and no consumer`,
+        file: parsedFile.file.relativePath,
+        rule: 'refs/orphan-messages',
+      });
+    }
+  }
+
+  return errors;
+};
+
+// Detect references to deprecated resources
+export const validateDeprecatedReferences = (parsedFiles: ParsedFile[]): ValidationError[] => {
+  const errors: ValidationError[] = [];
+
+  // Build an index of deprecated resources
+  const deprecatedIndex: Record<string, Set<string>> = {};
+  for (const parsedFile of parsedFiles) {
+    const { file, frontmatter } = parsedFile;
+    if (frontmatter.deprecated && frontmatter.deprecated !== false) {
+      const resourceId = (frontmatter.id as string) || file.resourceId;
+      const key = `${file.resourceType}:${resourceId}`;
+      if (!deprecatedIndex[key]) {
+        deprecatedIndex[key] = new Set();
+      }
+      if (frontmatter.version && typeof frontmatter.version === 'string') {
+        deprecatedIndex[key].add(frontmatter.version);
+      } else {
+        deprecatedIndex[key].add('*'); // All versions deprecated
+      }
+    }
+  }
+
+  if (Object.keys(deprecatedIndex).length === 0) return errors;
+
+  const isDeprecated = (type: string, id: string, version?: string): boolean => {
+    const key = `${type}:${id}`;
+    const versions = deprecatedIndex[key];
+    if (!versions) return false;
+    if (versions.has('*')) return true;
+    if (version && versions.has(version)) return true;
+    // For 'latest' or no version, check if any version is deprecated
+    if (!version || version === 'latest') return versions.size > 0;
+    return false;
+  };
+
+  for (const parsedFile of parsedFiles) {
+    const references = extractReferences(parsedFile);
+
+    for (const { ref, possibleTypes, field } of references) {
+      // Skip owner references for this check
+      if (field === 'owners' || field === 'members') continue;
+
+      for (const type of possibleTypes) {
+        if (isDeprecated(type, ref.id, ref.version)) {
+          const versionStr = ref.version ? ` (version: ${ref.version})` : '';
+          errors.push({
+            type: 'reference',
+            resource: `${parsedFile.file.resourceType}/${parsedFile.file.resourceId}`,
+            field,
+            message: `Referenced ${type} "${ref.id}"${versionStr} is deprecated`,
+            file: parsedFile.file.relativePath,
+            rule: 'versions/no-deprecated-references',
+          });
+          break; // Only report once per reference
+        }
+      }
+    }
+  }
+
+  return errors;
+};
+
+// Detect duplicate resource IDs (same type, same id, same version)
+export const validateDuplicateResourceIds = (parsedFiles: ParsedFile[]): ValidationError[] => {
+  const errors: ValidationError[] = [];
+
+  // Track seen resources: key = "type:id:version", value = file path
+  const seen: Record<string, string> = {};
+
+  for (const parsedFile of parsedFiles) {
+    const { file, frontmatter } = parsedFile;
+    const resourceId = (frontmatter.id as string) || file.resourceId;
+    const version = (frontmatter.version as string) || 'latest';
+    const key = `${file.resourceType}:${resourceId}:${version}`;
+
+    if (seen[key]) {
+      errors.push({
+        type: 'reference',
+        resource: `${file.resourceType}/${file.resourceId}`,
+        field: 'id',
+        message: `Duplicate ${file.resourceType} "${resourceId}" (version: ${version}) — also defined in ${seen[key]}`,
+        file: file.relativePath,
+        rule: 'structure/duplicate-resource-ids',
+      });
+    } else {
+      seen[key] = file.relativePath;
     }
   }
 
