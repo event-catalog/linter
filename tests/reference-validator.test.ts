@@ -681,4 +681,138 @@ describe('validateReferences', () => {
       expect(errors).toHaveLength(0); // Should pass - IDs match frontmatter, not directory names
     });
   });
+
+  describe('eventcatalog.config.js dependencies', () => {
+    it('should not report errors for references that exist in dependencies', () => {
+      const parsedFiles: ParsedFile[] = [
+        createParsedFile('service', 'order-service', {
+          id: 'order-service',
+          version: '1.0.0',
+          sends: [{ id: 'OrderPlaced' }],
+          receives: [{ id: 'CreateOrder' }],
+        }),
+      ];
+
+      const dependencies = {
+        event: [{ id: 'OrderPlaced', version: '1.0.0' }],
+        command: [{ id: 'CreateOrder' }],
+      };
+
+      const errors = validateReferences(parsedFiles, dependencies);
+      expect(errors).toHaveLength(0);
+    });
+
+    it('should still report errors for references not in dependencies or parsed files', () => {
+      const parsedFiles: ParsedFile[] = [
+        createParsedFile('service', 'order-service', {
+          id: 'order-service',
+          version: '1.0.0',
+          sends: [{ id: 'OrderPlaced' }, { id: 'NonExistentEvent' }],
+        }),
+      ];
+
+      const dependencies = {
+        event: [{ id: 'OrderPlaced', version: '1.0.0' }],
+      };
+
+      const errors = validateReferences(parsedFiles, dependencies);
+      expect(errors).toHaveLength(1);
+      expect(errors[0].message).toContain('NonExistentEvent');
+    });
+
+    it('should resolve version-specific references from dependencies', () => {
+      const parsedFiles: ParsedFile[] = [
+        createParsedFile('service', 'order-service', {
+          id: 'order-service',
+          version: '1.0.0',
+          sends: [{ id: 'OrderPlaced', version: '1.0.0' }],
+        }),
+      ];
+
+      const dependencies = {
+        event: [{ id: 'OrderPlaced', version: '1.0.0' }],
+      };
+
+      const errors = validateReferences(parsedFiles, dependencies);
+      expect(errors).toHaveLength(0);
+    });
+
+    it('should report errors when dependency version does not match reference version', () => {
+      const parsedFiles: ParsedFile[] = [
+        createParsedFile('service', 'order-service', {
+          id: 'order-service',
+          version: '1.0.0',
+          sends: [{ id: 'OrderPlaced', version: '2.0.0' }],
+        }),
+      ];
+
+      const dependencies = {
+        event: [{ id: 'OrderPlaced', version: '1.0.0' }],
+      };
+
+      const errors = validateReferences(parsedFiles, dependencies);
+      expect(errors).toHaveLength(1);
+      expect(errors[0].message).toContain('version: 2.0.0');
+    });
+
+    it('should handle dependencies without version as latest', () => {
+      const parsedFiles: ParsedFile[] = [
+        createParsedFile('service', 'order-service', {
+          id: 'order-service',
+          version: '1.0.0',
+          sends: [{ id: 'OrderPlaced' }],
+        }),
+      ];
+
+      const dependencies = {
+        event: [{ id: 'OrderPlaced' }],
+      };
+
+      const errors = validateReferences(parsedFiles, dependencies);
+      expect(errors).toHaveLength(0);
+    });
+
+    it('should support all dependency resource types', () => {
+      const parsedFiles: ParsedFile[] = [
+        createParsedFile('domain', 'e-commerce', {
+          version: '1.0.0',
+          services: [{ id: 'PaymentService' }],
+          domains: [{ id: 'Order' }],
+          entities: [{ id: 'OrderEntity' }],
+        }),
+        createParsedFile('service', 'my-service', {
+          id: 'my-service',
+          version: '1.0.0',
+          sends: [{ id: 'OrderPlaced' }],
+          receives: [{ id: 'GetOrder' }],
+        }),
+      ];
+
+      const dependencies = {
+        service: [{ id: 'PaymentService', version: '1.0.0' }],
+        domain: [{ id: 'Order', version: '1.0.0' }],
+        entity: [{ id: 'OrderEntity', version: '1.0.0' }],
+        event: [{ id: 'OrderPlaced', version: '1.0.0' }],
+        query: [{ id: 'GetOrder' }],
+      };
+
+      const errors = validateReferences(parsedFiles, dependencies);
+      expect(errors).toHaveLength(0);
+    });
+
+    it('should add dependency index entries to buildResourceIndex', () => {
+      const parsedFiles: ParsedFile[] = [];
+      const dependencies = {
+        event: [{ id: 'OrderPlaced', version: '1.0.0' }],
+        service: [{ id: 'PaymentService' }],
+      };
+
+      const index = buildResourceIndex(parsedFiles, dependencies);
+
+      expect(index.event['OrderPlaced']).toBeDefined();
+      expect(index.event['OrderPlaced'].has('1.0.0')).toBe(true);
+      expect(index.service['PaymentService']).toBeDefined();
+      expect(index.service['PaymentService'].has('latest')).toBe(true);
+    });
+  });
 });

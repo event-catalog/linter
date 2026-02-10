@@ -9,7 +9,7 @@ import { parseAllFiles } from '../parser';
 import { validateCatalog } from '../validators';
 import { reportErrors } from '../reporters';
 import { LinterOptions } from '../types';
-import { loadConfig, shouldIgnoreFile, getEffectiveRules, applyRuleSeverity } from '../config';
+import { loadConfig, loadEventCatalogConfig, shouldIgnoreFile, getEffectiveRules, applyRuleSeverity } from '../config';
 
 const program = new Command();
 
@@ -27,6 +27,7 @@ program
     try {
       // Load configuration
       const config = loadConfig(rootDir);
+      const dependencies = loadEventCatalogConfig(rootDir);
 
       spinner.text = 'Scanning EventCatalog files...';
       const allFiles = await scanCatalogFiles(rootDir);
@@ -50,7 +51,7 @@ program
       const { parsed, errors: parseErrors } = await parseAllFiles(files);
 
       spinner.text = 'Validating catalog...';
-      const rawValidationErrors = validateCatalog(parsed);
+      const rawValidationErrors = validateCatalog(parsed, dependencies);
 
       // Apply rule configuration to each file's errors
       const validationErrors = parsed.flatMap((parsedFile) => {

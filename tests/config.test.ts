@@ -4,11 +4,13 @@ import path from 'path';
 import os from 'os';
 import {
   loadConfig,
+  loadEventCatalogConfig,
   shouldIgnoreFile,
   getEffectiveRules,
   applyRuleSeverity,
   parseRuleConfig,
   DEFAULT_RULES,
+  DEFAULT_IGNORE_PATTERNS,
 } from '../src/config';
 import { ValidationError } from '../src/types';
 
@@ -34,7 +36,7 @@ describe('Configuration', () => {
 
       expect(config).toEqual({
         rules: DEFAULT_RULES,
-        ignorePatterns: [],
+        ignorePatterns: DEFAULT_IGNORE_PATTERNS,
         overrides: [],
       });
     });
@@ -65,7 +67,7 @@ describe('Configuration', () => {
       expect(config.rules['schema/required-fields']).toBe('warn');
       expect(config.rules['refs/owner-exists']).toBe('off');
       expect(config.rules['schema/valid-email']).toBe('error'); // Should keep default
-      expect(config.ignorePatterns).toEqual(['**/archived/**', '**/drafts/**']);
+      expect(config.ignorePatterns).toEqual([...DEFAULT_IGNORE_PATTERNS, '**/archived/**', '**/drafts/**']);
       expect(config.overrides).toHaveLength(1);
       expect(config.overrides![0].files).toEqual(['**/experimental/**']);
     });
@@ -77,9 +79,88 @@ describe('Configuration', () => {
 
       expect(config).toEqual({
         rules: DEFAULT_RULES,
-        ignorePatterns: [],
+        ignorePatterns: DEFAULT_IGNORE_PATTERNS,
         overrides: [],
       });
+    });
+  });
+
+  describe('loadEventCatalogConfig', () => {
+    it('should return empty object when no eventcatalog.config.js exists', () => {
+      const result = loadEventCatalogConfig(tempDir);
+      expect(result).toEqual({});
+    });
+
+    it('should parse dependencies from eventcatalog.config.js', () => {
+      const ecConfigPath = path.join(tempDir, 'eventcatalog.config.js');
+      fs.writeFileSync(
+        ecConfigPath,
+        `module.exports = {
+          dependencies: {
+            events: [{ id: 'OrderPlaced', version: '1.0.0' }],
+            commands: [{ id: 'CreateOrder' }],
+            queries: [{ id: 'GetOrder' }],
+            services: [{ id: 'PaymentService' }],
+            domains: [{ id: 'Order', version: '1.0.0' }],
+          }
+        };`
+      );
+
+      const result = loadEventCatalogConfig(tempDir);
+
+      expect(result.event).toEqual([{ id: 'OrderPlaced', version: '1.0.0' }]);
+      expect(result.command).toEqual([{ id: 'CreateOrder', version: undefined }]);
+      expect(result.query).toEqual([{ id: 'GetOrder', version: undefined }]);
+      expect(result.service).toEqual([{ id: 'PaymentService', version: undefined }]);
+      expect(result.domain).toEqual([{ id: 'Order', version: '1.0.0' }]);
+    });
+
+    it('should return empty object when config has no dependencies', () => {
+      const ecConfigPath = path.join(tempDir, 'eventcatalog.config.js');
+      fs.writeFileSync(ecConfigPath, `module.exports = { title: 'My Catalog' };`);
+
+      const result = loadEventCatalogConfig(tempDir);
+      expect(result).toEqual({});
+    });
+
+    it('should handle invalid eventcatalog.config.js gracefully', () => {
+      const ecConfigPath = path.join(tempDir, 'eventcatalog.config.js');
+      fs.writeFileSync(ecConfigPath, 'invalid javascript {');
+
+      const result = loadEventCatalogConfig(tempDir);
+      expect(result).toEqual({});
+    });
+
+    it('should skip unknown plural keys in dependencies', () => {
+      const ecConfigPath = path.join(tempDir, 'eventcatalog.config.js');
+      fs.writeFileSync(
+        ecConfigPath,
+        `module.exports = {
+          dependencies: {
+            events: [{ id: 'OrderPlaced' }],
+            unknownThings: [{ id: 'Something' }],
+          }
+        };`
+      );
+
+      const result = loadEventCatalogConfig(tempDir);
+      expect(result.event).toEqual([{ id: 'OrderPlaced', version: undefined }]);
+      expect(result['unknownThing']).toBeUndefined();
+    });
+
+    it('should filter out entries without a valid id', () => {
+      const ecConfigPath = path.join(tempDir, 'eventcatalog.config.js');
+      fs.writeFileSync(
+        ecConfigPath,
+        `module.exports = {
+          dependencies: {
+            events: [{ id: 'OrderPlaced' }, { version: '1.0.0' }, null, { id: 123 }],
+          }
+        };`
+      );
+
+      const result = loadEventCatalogConfig(tempDir);
+      expect(result.event).toEqual([{ id: 'OrderPlaced', version: undefined }]);
     });
   });
 
@@ -112,6 +193,13 @@ describe('Configuration', () => {
       expect(shouldIgnoreFile('services/archived/old-service/index.mdx', patterns)).toBe(true);
       expect(shouldIgnoreFile('events/drafts/new-event/index.mdx', patterns)).toBe(true);
       expect(shouldIgnoreFile('services/user-service/index.mdx', patterns)).toBe(false);
+    });
+
+    it('should ignore files in dependencies directory by default', () => {
+      expect(shouldIgnoreFile('dependencies/events/my.company.LocationSyncEvent/index.md', DEFAULT_IGNORE_PATTERNS)).toBe(true);
+      expect(shouldIgnoreFile('dependencies/events/my.company.CarrierSyncEvent/index.md', DEFAULT_IGNORE_PATTERNS)).toBe(true);
+      expect(shouldIgnoreFile('events/OrderPlaced/index.mdx', DEFAULT_IGNORE_PATTERNS)).toBe(false);
+      expect(shouldIgnoreFile('services/user-service/index.mdx', DEFAULT_IGNORE_PATTERNS)).toBe(false);
     });
 
     it('should handle single wildcard patterns', () => {

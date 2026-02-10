@@ -1,6 +1,7 @@
 import { ParsedFile } from '../parser';
 import { ValidationError, ResourceReference } from '../types';
 import { ResourceType } from '../schemas';
+import { CatalogDependencies } from '../config';
 import semver from 'semver';
 
 interface ResourceIndex {
@@ -9,7 +10,7 @@ interface ResourceIndex {
   };
 }
 
-export const buildResourceIndex = (parsedFiles: ParsedFile[]): ResourceIndex => {
+export const buildResourceIndex = (parsedFiles: ParsedFile[], dependencies?: CatalogDependencies): ResourceIndex => {
   const index: ResourceIndex = {};
 
   for (const parsedFile of parsedFiles) {
@@ -38,6 +39,21 @@ export const buildResourceIndex = (parsedFiles: ParsedFile[]): ResourceIndex => 
       index[resourceType][resourceId].add(frontmatter.version);
     } else {
       index[resourceType][resourceId].add('latest');
+    }
+  }
+
+  // Add dependency entries to the index
+  if (dependencies) {
+    for (const [resourceType, entries] of Object.entries(dependencies)) {
+      if (!index[resourceType]) {
+        index[resourceType] = {};
+      }
+      for (const entry of entries) {
+        if (!index[resourceType][entry.id]) {
+          index[resourceType][entry.id] = new Set();
+        }
+        index[resourceType][entry.id].add(entry.version || 'latest');
+      }
     }
   }
 
@@ -185,8 +201,8 @@ const extractReferences = (parsedFile: ParsedFile): ReferenceInfo[] => {
   return references;
 };
 
-export const validateReferences = (parsedFiles: ParsedFile[]): ValidationError[] => {
-  const index = buildResourceIndex(parsedFiles);
+export const validateReferences = (parsedFiles: ParsedFile[], dependencies?: CatalogDependencies): ValidationError[] => {
+  const index = buildResourceIndex(parsedFiles, dependencies);
   const errors: ValidationError[] = [];
 
   for (const parsedFile of parsedFiles) {

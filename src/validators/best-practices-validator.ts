@@ -20,8 +20,12 @@ export const validateBestPractices = (parsedFiles: ParsedFile[]): ValidationErro
       });
     }
 
-    // Check for required owners
-    if (!frontmatter.owners || !Array.isArray(frontmatter.owners) || frontmatter.owners.length === 0) {
+    // Check for required owners (skip users and teams - they are owners, not owned)
+    if (
+      file.resourceType !== 'user' &&
+      file.resourceType !== 'team' &&
+      (!frontmatter.owners || !Array.isArray(frontmatter.owners) || frontmatter.owners.length === 0)
+    ) {
       errors.push({
         type: 'schema',
         resource: `${file.resourceType}/${file.resourceId}`,
