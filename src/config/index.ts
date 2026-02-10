@@ -20,6 +20,8 @@ export interface LinterConfig {
   overrides?: ConfigOverride[];
 }
 
+export const DEFAULT_IGNORE_PATTERNS: string[] = ['dependencies/**'];
+
 export const DEFAULT_RULES: Record<string, RuleSeverity> = {
   'schema/required-fields': 'error',
   'schema/valid-semver': 'error',
@@ -34,6 +36,59 @@ export const DEFAULT_RULES: Record<string, RuleSeverity> = {
   'versions/no-deprecated': 'error',
 };
 
+export interface DependencyEntry {
+  id: string;
+  version?: string;
+}
+
+export type CatalogDependencies = Record<string, DependencyEntry[]>;
+
+const PLURAL_TO_SINGULAR: Record<string, string> = {
+  events: 'event',
+  commands: 'command',
+  queries: 'query',
+  services: 'service',
+  domains: 'domain',
+  entities: 'entity',
+  channels: 'channel',
+  flows: 'flow',
+  users: 'user',
+  teams: 'team',
+};
+
+export const loadEventCatalogConfig = (rootDir: string): CatalogDependencies => {
+  const configPath = path.join(rootDir, 'eventcatalog.config.js');
+
+  if (!fs.existsSync(configPath)) {
+    return {};
+  }
+
+  try {
+    delete require.cache[require.resolve(configPath)];
+    const config = require(configPath);
+
+    if (!config.dependencies || typeof config.dependencies !== 'object') {
+      return {};
+    }
+
+    const dependencies: CatalogDependencies = {};
+
+    for (const [pluralKey, entries] of Object.entries(config.dependencies)) {
+      const singularType = PLURAL_TO_SINGULAR[pluralKey];
+      if (!singularType || !Array.isArray(entries)) continue;
+
+      dependencies[singularType] = (entries as any[])
+        .filter((entry) => entry && typeof entry.id === 'string')
+        .map((entry) => ({ id: entry.id, version: entry.version }));
+    }
+
+    return dependencies;
+  } catch (error) {
+    console.warn(`Warning: Could not load eventcatalog.config.js: ${error instanceof Error ? error.message : String(error)}`);
+    return {};
+  }
+};
+
 export const loadConfig = (rootDir: string): LinterConfig => {
   const configPath = path.join(rootDir, '.eventcatalogrc.js');
 
@@ -41,7 +96,7 @@ export const loadConfig = (rootDir: string): LinterConfig => {
     // Return default config if no config file exists
     return {
       rules: DEFAULT_RULES,
-      ignorePatterns: [],
+      ignorePatterns: DEFAULT_IGNORE_PATTERNS,
       overrides: [],
     };
   }
@@ -54,7 +109,7 @@ export const loadConfig = (rootDir: string): LinterConfig => {
     // Merge with defaults
     const mergedConfig: LinterConfig = {
       rules: { ...DEFAULT_RULES, ...config.rules },
-      ignorePatterns: config.ignorePatterns || [],
+      ignorePatterns: [...DEFAULT_IGNORE_PATTERNS, ...(config.ignorePatterns || [])],
       overrides: config.overrides || [],
     };
 
@@ -63,7 +118,7 @@ export const loadConfig = (rootDir: string): LinterConfig => {
     console.warn(`Warning: Could not load .eventcatalogrc.js: ${error instanceof Error ? error.message : String(error)}`);
     return {
       rules: DEFAULT_RULES,
-      ignorePatterns: [],
+      ignorePatterns: DEFAULT_IGNORE_PATTERNS,
       overrides: [],
     };
   }
