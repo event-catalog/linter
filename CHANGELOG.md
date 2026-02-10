@@ -1,5 +1,11 @@
 # @eventcatalog/linter
 
+## 0.1.1
+
+### Patch Changes
+
+- cbc5b8c: Recognize eventcatalog.config.js dependencies in reference validation
+
 ## 0.1.0
 
 ### Minor Changes
