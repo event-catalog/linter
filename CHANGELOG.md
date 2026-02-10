@@ -1,5 +1,11 @@
 # @eventcatalog/linter
 
+## 1.0.0
+
+### Major Changes
+
+- f92cbc4: feat: add 8 new linter rules
+
 ## 0.1.1
 
 ### Patch Changes
